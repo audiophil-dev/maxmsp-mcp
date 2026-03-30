@@ -1,6 +1,6 @@
 
 autowatch = 1; // 1
-inlets = 2; // inlet 0: network messages; inlet 1: [console] output (packed list: source, text, type)
+inlets = 2; // inlet 0: network messages; inlet 1: [console] output via [pack s s 0]
 outlets = 3; // For status, responses, etc.
 
 // Subpatcher navigation state
@@ -80,13 +80,16 @@ function check_large_patch_warning() {
 // Called when a message arrives at inlet 0 (from [udpreceive] or similar)
 // or inlet 1 (from [console] output -- message text)
 function anything() {
-    // Inlet 1: console messages from [console] outlet 1 (message text)
-    // Messages arrive as symbol + arguments. Concatenate all parts to
-    // reconstruct the full console line.
+    // Inlet 1: [console] output via [pack s s 0]
+    // [console] outlet 1 (text) -> [tosymbol] -> [pack] inlet 1 (preserves multi-word text)
+    // [console] outlet 0 (source) -> [pack] inlet 0 (triggers output, RTL fires last)
+    // [console] outlet 2 (type) -> [pack] inlet 2
+    // Result: messagename = source, arguments[0] = text (symbol), arguments[1] = type (int)
     if (this.inlet === 1) {
-        var parts = arrayfromargs(messagename, arguments);
-        var text = parts.join(" ");
-        console_buffer.push({s: "", t: text, tp: 0});
+        var source = String(messagename);
+        var text = String(arguments[0] || "");
+        var type = arguments[1] || 0;
+        console_buffer.push({s: source, t: text, tp: type});
         if (console_buffer.length > CONSOLE_BUFFER_MAX) {
             console_buffer.shift();
         }
