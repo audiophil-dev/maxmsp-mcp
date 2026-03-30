@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP (Model Context Protocol) server and client for Max/MSP integration. Enables AI agents to create, modify, query, and test Max/MSP patches programmatically through 28 MCP tools.
+MCP (Model Context Protocol) server and client for Max/MSP integration. Enables AI agents to create, modify, query, and test Max/MSP patches programmatically through 31 MCP tools.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Agent (OpenCode/Claude) <-- MCP --> server.py (FastMCP/Python)
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| server.py | Root | FastMCP server with 28 tools |
+| server.py | Root | FastMCP server with 31 tools |
 | max_mcp.js | MaxMSP_Agent/ | Max-side message handler (legacy js engine) |
 | max_mcp_node.js | MaxMSP_Agent/ | Node.js Socket.IO bridge |
 | max_mcp_v8_add_on.js | MaxMSP_Agent/ | v8 engine addon for boxtext, autofit, signal safety, patcher targeting |
@@ -30,7 +30,7 @@ Agent (OpenCode/Claude) <-- MCP --> server.py (FastMCP/Python)
 | docs.json | Root | Max object reference database (1,129 objects) |
 | CLAUDE.md | Root | Critical rules for MCP tool usage (Claude Code) |
 
-## MCP Tool Categories (28 tools)
+## MCP Tool Categories (31 tools)
 
 - **Object creation/manipulation**: add_max_object, remove_max_object, connect/disconnect, move_object, recreate_with_args, autofit_existing
 - **Object properties**: set_object_attribute, set_message_text, set_number, send_bang, send_messages
@@ -38,6 +38,7 @@ Agent (OpenCode/Claude) <-- MCP --> server.py (FastMCP/Python)
 - **Subpatcher**: create_subpatcher, enter/exit_subpatcher, get_patcher_context, add_subpatcher_io
 - **Safety**: check_signal_safety, encapsulate
 - **Patcher targeting**: list_patchers, target_patcher
+- **Console**: get_max_console, clear_max_console, clear_console_buffer
 
 ## Technology Stack
 
@@ -48,4 +49,4 @@ Agent (OpenCode/Claude) <-- MCP --> server.py (FastMCP/Python)
 
 ## Current Status
 
-OpenCode integration functional. MCP server works with both OpenCode and Claude Code. Bridge supports multi-patcher targeting via list_patchers/target_patcher.
+OpenCode integration functional. MCP server works with both OpenCode and Claude Code. Bridge supports multi-patcher targeting via list_patchers/target_patcher. Console reading via get_max_console enables automated test assertions through post() output capture.

@@ -1,6 +1,6 @@
 
 autowatch = 1; // 1
-inlets = 1; // Receive network messages here
+inlets = 2; // inlet 0: network messages; inlet 1: [console] output via [pack s s 0]
 outlets = 3; // For status, responses, etc.
 
 // Subpatcher navigation state
@@ -30,6 +30,10 @@ var LARGE_PATCH_THRESHOLD = 80;
 // Signal safety auto-check (triggers every N MSP objects created)
 var msp_objects_counter = 0;
 var MSP_SAFETY_CHECK_INTERVAL = 10;
+
+// Console ring buffer (captures Max console output via [console] -> inlet 1)
+var CONSOLE_BUFFER_MAX = 10000;
+var console_buffer = []; // each entry: {s: source, t: text, tp: type}
 
 function safe_parse_json(str) {
     try {
@@ -74,7 +78,24 @@ function check_large_patch_warning() {
 }
 
 // Called when a message arrives at inlet 0 (from [udpreceive] or similar)
+// or inlet 1 (from [console] output -- message text)
 function anything() {
+    // Inlet 1: [console] output via [pack s s 0]
+    // [console] outlet 1 (text) -> [tosymbol] -> [pack] inlet 1 (preserves multi-word text)
+    // [console] outlet 0 (source) -> [pack] inlet 0 (triggers output, RTL fires last)
+    // [console] outlet 2 (type) -> [pack] inlet 2
+    // Result: messagename = source, arguments[0] = text (symbol), arguments[1] = type (int)
+    if (this.inlet === 1) {
+        var source = String(messagename);
+        var text = String(arguments[0] || "");
+        var type = arguments[1] || 0;
+        console_buffer.push({s: source, t: text, tp: type});
+        if (console_buffer.length > CONSOLE_BUFFER_MAX) {
+            console_buffer.shift();
+        }
+        return;
+    }
+
     var msg = arrayfromargs(messagename, arguments).join(" ");
     var data = safe_parse_json(msg);
     if (!data) return;
@@ -253,6 +274,27 @@ function anything() {
                 target_patcher(data.request_id, data.name, data.filepath || null);
             } else {
                 outlet(0, "error", "Missing request_id or name for target_patcher");
+            }
+            break;
+        case "get_max_console":
+            if (data.request_id) {
+                get_max_console(data.request_id, data.lines || 100);
+            } else {
+                outlet(0, "error", "Missing request_id for get_max_console");
+            }
+            break;
+        case "clear_max_console":
+            if (data.request_id) {
+                clear_max_console(data.request_id);
+            } else {
+                outlet(0, "error", "Missing request_id for clear_max_console");
+            }
+            break;
+        case "clear_console_buffer":
+            if (data.request_id) {
+                clear_console_buffer(data.request_id);
+            } else {
+                outlet(0, "error", "Missing request_id for clear_console_buffer");
             }
             break;
         default:
@@ -1541,6 +1583,63 @@ function target_patcher(request_id, name, filepath) {
     // Always delegate to v8 for the response (v8 has reliable access)
     var data = JSON.stringify({"name": name, "filepath": filepath || ""});
     outlet(2, "target_patcher", request_id, data);
+}
+
+// ========================================
+// Console reading:
+
+var CONSOLE_MISSING_ERROR = "Console capture not available. The MCP bridge needs a [console] object (named 'mcp_console') wired to inlet 1 of the [js] object via [pack s s 0]. Add a [console] object to the bridge subpatcher, set its scripting name to 'mcp_console', and connect: [console mcp_console] -> [pack s s 0] -> [js max_mcp.js] inlet 1.";
+
+function get_max_console(request_id, lines) {
+    if (console_buffer.length === 0) {
+        // Check if console object is wired
+        var consoleObj = this.patcher.getnamed("mcp_console");
+        if (!consoleObj) {
+            var result = {"request_id": request_id, "results": {
+                "error": CONSOLE_MISSING_ERROR
+            }};
+            outlet(1, "response", JSON.stringify(result));
+            return;
+        }
+    }
+    var entries = console_buffer.slice(-lines);
+    var formatted = [];
+    for (var i = 0; i < entries.length; i++) {
+        formatted.push(entries[i].s + ": " + entries[i].t);
+    }
+    var result = {"request_id": request_id, "results": {
+        "total_buffered": console_buffer.length,
+        "returned_lines": entries.length,
+        "content": formatted.join("\n")
+    }};
+    outlet(1, "response", JSON.stringify(result));
+}
+
+function clear_max_console(request_id) {
+    var consoleObj = this.patcher.getnamed("mcp_console");
+    if (!consoleObj) {
+        var result = {"request_id": request_id, "results": {
+            "error": CONSOLE_MISSING_ERROR
+        }};
+        outlet(1, "response", JSON.stringify(result));
+        return;
+    }
+    consoleObj.message("clear");
+    var result = {"request_id": request_id, "results": {
+        "success": true,
+        "note": "Visual console cleared. Ring buffer intact (" + console_buffer.length + " entries)."
+    }};
+    outlet(1, "response", JSON.stringify(result));
+}
+
+function clear_console_buffer(request_id) {
+    var cleared = console_buffer.length;
+    console_buffer = [];
+    var result = {"request_id": request_id, "results": {
+        "success": true,
+        "cleared_entries": cleared
+    }};
+    outlet(1, "response", JSON.stringify(result));
 }
 
 // ========================================

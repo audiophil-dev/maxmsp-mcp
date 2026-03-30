@@ -59,3 +59,29 @@ Use `check_signal_safety` tool after connecting signal objects to verify no dang
 ## Subpatcher Pattern
 
 Plan interface (inlets/outlets) before building internals. Use `create_subpatcher` then `enter_subpatcher` to build inside.
+
+## Console Reading Pattern
+
+The bridge captures Max console output via a `[console]` object (named `mcp_console`) inside the bridge subpatcher. Wiring:
+
+```
+[console mcp_console]
+   |0 (source)     |1 (text)          |2 (type)
+   |                v                  |
+   |           [tosymbol]              |
+   |                |                  |
+   v                v                  v
+   [pack s s 0] -------- inlet 0, 1, 2
+        |
+        v
+   [js max_mcp.js] inlet 1
+```
+
+`[tosymbol]` converts multi-word message text into a single symbol so `[pack]` preserves the full text. Without it, `[pack s s 0]` truncates at the first word.
+
+In JS, inlet 1 handler receives: `messagename` = source name, `arguments[0]` = full text (symbol), `arguments[1]` = type (int). Entries stored in a 10,000-entry ring buffer.
+
+Three MCP tools:
+- `get_max_console(lines)` -- read last N entries from ring buffer
+- `clear_max_console()` -- clear visual console only (buffer preserved)
+- `clear_console_buffer()` -- clear ring buffer only (visual console unchanged)
