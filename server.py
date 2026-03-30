@@ -953,5 +953,58 @@ async def encapsulate(
     return response
 
 
+# ========================================
+# Patcher targeting:
+
+
+@mcp.tool()
+async def list_patchers(ctx: Context):
+    """List all open patcher windows in Max.
+
+    Returns a list of open patchers with their names, file paths, object counts,
+    and which one is currently targeted by the MCP bridge.
+
+    Use this to discover available patchers before calling target_patcher.
+
+    Returns:
+        dict: Contains 'patchers' list and 'current_target' name.
+    """
+    maxmsp = ctx.request_context.lifespan_context.get("maxmsp")
+    payload = {"action": "list_patchers"}
+    response = await maxmsp.send_request(payload)
+    return response
+
+
+@mcp.tool()
+async def target_patcher(
+    ctx: Context,
+    name: str,
+    filepath: str = "",
+):
+    """Switch the MCP bridge to target a different open patcher.
+
+    After calling this, all subsequent operations (add_max_object, connect_max_objects,
+    get_objects_in_patch, etc.) will operate on the targeted patcher.
+
+    Use list_patchers first to see available patchers.
+
+    Args:
+        name (str): Name of the patcher to target (window title), or "front" for the frontmost patcher.
+        filepath (str): Optional file path to disambiguate when multiple patchers share the same name.
+
+    Returns:
+        dict: Success status with the targeted patcher name and filepath.
+    """
+    maxmsp = ctx.request_context.lifespan_context.get("maxmsp")
+    payload = {
+        "action": "target_patcher",
+        "name": name,
+    }
+    if filepath:
+        payload["filepath"] = filepath
+    response = await maxmsp.send_request(payload)
+    return response
+
+
 if __name__ == "__main__":
     mcp.run()
