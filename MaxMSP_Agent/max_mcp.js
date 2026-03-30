@@ -78,16 +78,15 @@ function check_large_patch_warning() {
 }
 
 // Called when a message arrives at inlet 0 (from [udpreceive] or similar)
-// or inlet 1 (from [console] via [pack s s 0])
+// or inlet 1 (from [console] output -- message text)
 function anything() {
-    // Inlet 1: console messages from [pack s s 0] -> [tosymbol]
-    // [pack s s 0] output starts with a symbol, so Max JS routes it here as
-    // an "anything" message where messagename = source, arguments = [text, type]
+    // Inlet 1: console messages from [console] outlet 1 (message text)
+    // Messages arrive as symbol + arguments. Concatenate all parts to
+    // reconstruct the full console line.
     if (this.inlet === 1) {
-        var source = messagename;
-        var text = String(arguments[0] || "");
-        var type = arguments[1] || 0;
-        console_buffer.push({s: source, t: text, tp: type});
+        var parts = arrayfromargs(messagename, arguments);
+        var text = parts.join(" ");
+        console_buffer.push({s: "", t: text, tp: 0});
         if (console_buffer.length > CONSOLE_BUFFER_MAX) {
             console_buffer.shift();
         }

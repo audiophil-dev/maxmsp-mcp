@@ -260,23 +260,12 @@
                             },
                             {
                                 "box": {
-                                    "id": "sub-pack-console",
-                                    "maxclass": "newobj",
-                                    "numinlets": 3,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
-                                    "patching_rect": [ 350.0, 240.0, 72.0, 22.0 ],
-                                    "text": "pack s s 0"
-                                }
-                            },
-                            {
-                                "box": {
                                     "id": "sub-console-label",
                                     "maxclass": "comment",
                                     "numinlets": 1,
                                     "numoutlets": 0,
-                                    "patching_rect": [ 480.0, 200.0, 150.0, 20.0 ],
-                                    "text": "Console capture -> js inlet 1"
+                                    "patching_rect": [ 480.0, 200.0, 170.0, 20.0 ],
+                                    "text": "Console outlet 1 -> js inlet 1"
                                 }
                             }
                         ],
@@ -367,26 +356,8 @@
                             },
                             {
                                 "patchline": {
-                                    "destination": [ "sub-pack-console", 0 ],
-                                    "source": [ "sub-console", 0 ]
-                                }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "sub-pack-console", 1 ],
-                                    "source": [ "sub-console", 1 ]
-                                }
-                            },
-                            {
-                                "patchline": {
-                                    "destination": [ "sub-pack-console", 2 ],
-                                    "source": [ "sub-console", 2 ]
-                                }
-                            },
-                            {
-                                "patchline": {
                                     "destination": [ "sub-js", 1 ],
-                                    "source": [ "sub-pack-console", 0 ]
+                                    "source": [ "sub-console", 1 ]
                                 }
                             }
                         ]
