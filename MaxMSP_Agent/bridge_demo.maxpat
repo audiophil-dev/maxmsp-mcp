@@ -251,8 +251,8 @@
                                     "id": "sub-console",
                                     "maxclass": "newobj",
                                     "numinlets": 1,
-                                    "numoutlets": 1,
-                                    "outlettype": [ "" ],
+                                    "numoutlets": 3,
+                                    "outlettype": [ "", "", "int" ],
                                     "patching_rect": [ 350.0, 200.0, 120.0, 22.0 ],
                                     "varname": "mcp_console",
                                     "text": "console"
@@ -369,6 +369,18 @@
                                 "patchline": {
                                     "destination": [ "sub-pack-console", 0 ],
                                     "source": [ "sub-console", 0 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "sub-pack-console", 1 ],
+                                    "source": [ "sub-console", 1 ]
+                                }
+                            },
+                            {
+                                "patchline": {
+                                    "destination": [ "sub-pack-console", 2 ],
+                                    "source": [ "sub-console", 2 ]
                                 }
                             },
                             {

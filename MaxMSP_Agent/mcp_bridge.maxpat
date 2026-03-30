@@ -180,8 +180,8 @@
                     "id": "obj-console",
                     "maxclass": "newobj",
                     "numinlets": 1,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
+                    "numoutlets": 3,
+                    "outlettype": [ "", "", "int" ],
                     "patching_rect": [ 350.0, 200.0, 120.0, 22.0 ],
                     "varname": "mcp_console",
                     "text": "console"
@@ -298,6 +298,18 @@
                 "patchline": {
                     "destination": [ "obj-pack-console", 0 ],
                     "source": [ "obj-console", 0 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-pack-console", 1 ],
+                    "source": [ "obj-console", 1 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-pack-console", 2 ],
+                    "source": [ "obj-console", 2 ]
                 }
             },
             {
