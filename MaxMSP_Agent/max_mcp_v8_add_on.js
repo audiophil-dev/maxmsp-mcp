@@ -3,6 +3,10 @@ autowatch = 1; // 1
 inlets = 1; // Receive network messages here
 outlets = 2; // For status, responses, etc.
 
+// If v8 is inside a subpatcher/abstraction, target the parent patcher.
+// Matches the same logic in max_mcp.js for bridge-in-subpatcher support.
+var target_patcher = this.patcher.parentpatcher ? this.patcher.parentpatcher : this.patcher;
+
 function safe_parse_json(str) {
     try {
         return JSON.parse(str);
@@ -53,6 +57,20 @@ function anything() {
             }
             complete_signal_safety(arguments[0]);
             break;
+        case "list_patchers":
+            if (arguments.length < 1) {
+                post("list_patchers: need request_id arg\n");
+                return;
+            }
+            list_patchers_v8(arguments[0]);
+            break;
+        case "target_patcher":
+            if (arguments.length < 2) {
+                post("target_patcher: need request_id and data args\n");
+                return;
+            }
+            target_patcher_v8(arguments[0], arguments[1]);
+            break;
         default:
             // outlet(1, messagename, ...arguments);
             outlet(1, "response", arguments[1]);
@@ -62,7 +80,7 @@ function anything() {
 function add_boxtext(request_id, data){
     // post(patcher_dict + "\n");
     var patcher_dict = safe_parse_json(data);
-    var p = this.patcher;
+    var p = target_patcher;
 
     patcher_dict.boxes.forEach(function (b) {
         var obj = p.getnamed(b.box.varname);
@@ -105,7 +123,7 @@ function complete_signal_safety(data_str) {
     var data = safe_parse_json(data_str);
     if (!data) return;
 
-    var p = this.patcher;
+    var p = target_patcher;
     var request_id = data.request_id;
     var warnings = data.warnings || [];
     var objects_to_check = data.objects_to_check || [];
@@ -235,7 +253,7 @@ function complete_encapsulate(data_str) {
     var data = safe_parse_json(data_str);
     if (!data) return;
 
-    var p = this.patcher;
+    var p = target_patcher;
     var request_id = data.request_id;
     var subpatcher_varname = data.subpatcher_varname;
     var objects_info = data.objects_info;
@@ -439,7 +457,7 @@ function complete_encapsulate(data_str) {
 }
 
 function autofit_v8(var_name) {
-    var p = this.patcher;
+    var p = target_patcher;
     var obj = p.getnamed(var_name);
 
     if (!obj) {
@@ -495,6 +513,160 @@ function autofit_v8(var_name) {
         obj.rect = [rect[0], rect[1], rect[0] + calculated_width, rect[1] + current_height];
         post("autofit_v8 " + var_name + ": " + current_width + "px -> " + calculated_width + "px (" + text + ")\n");
     }
+}
+
+// ========================================
+// Patcher targeting (v8 engine)
+
+// Walk up from this.patcher to find the top-level patcher
+function get_top_patcher() {
+    var p = this.patcher;
+    while (p.parentpatcher) {
+        p = p.parentpatcher;
+    }
+    return p;
+}
+
+function list_patchers_v8(request_id) {
+    var patchers = [];
+
+    // Try max.frontpatcher first
+    var top = max.frontpatcher;
+
+    // Fallback: walk up from this.patcher
+    if (!top) {
+        top = get_top_patcher();
+    }
+
+    if (!top || !top.wind) {
+        // Last resort: just report our own target patcher
+        var current_target_name = target_patcher ? (target_patcher.name || "(untitled)") : null;
+        var results = {"request_id": request_id, "results": {
+            "patchers": target_patcher ? [{
+                name: target_patcher.name || "(untitled)",
+                filepath: target_patcher.filepath || "",
+                object_count: target_patcher.count || 0,
+                is_front: true
+            }] : [],
+            "current_target": current_target_name,
+            "current_target_filepath": target_patcher ? (target_patcher.filepath || "") : "",
+            "debug": "max.frontpatcher=" + (max.frontpatcher ? "ok" : "null") + ", wind=" + (top ? (top.wind ? "ok" : "null") : "no_top")
+        }};
+        outlet(1, "response", JSON.stringify(results));
+        return;
+    }
+
+    var w = top.wind;
+    var is_first = true;
+    while (w) {
+        var p_ref = w.assoc;
+        if (p_ref) {
+            patchers.push({
+                name: p_ref.name || "(untitled)",
+                filepath: p_ref.filepath || "",
+                object_count: p_ref.count || 0,
+                is_front: is_first
+            });
+        }
+        is_first = false;
+        w = w.next;
+    }
+
+    var current_target_name = target_patcher ? (target_patcher.name || "(untitled)") : null;
+    var current_filepath = target_patcher ? (target_patcher.filepath || "") : "";
+
+    var results = {"request_id": request_id, "results": {
+        "patchers": patchers,
+        "current_target": current_target_name,
+        "current_target_filepath": current_filepath
+    }};
+    outlet(1, "response", JSON.stringify(results));
+}
+
+function target_patcher_v8(request_id, data_str) {
+    var data = safe_parse_json(data_str);
+    if (!data) return;
+
+    var name = data.name;
+    var filepath = data.filepath || "";
+
+    // Get a starting point for Wind traversal
+    var top = max.frontpatcher;
+    if (!top) {
+        top = get_top_patcher();
+    }
+
+    // Special case: target the front patcher
+    if (name === "front") {
+        var front = max.frontpatcher;
+        if (!front) {
+            // Fallback: use the top patcher we found
+            front = top;
+        }
+        if (!front) {
+            var results = {"request_id": request_id, "results": {
+                "success": false,
+                "error": "No front patcher available."
+            }};
+            outlet(1, "response", JSON.stringify(results));
+            return;
+        }
+        target_patcher = front;
+        var results = {"request_id": request_id, "results": {
+            "success": true,
+            "targeted": front.name || "(untitled)",
+            "filepath": front.filepath || ""
+        }};
+        outlet(1, "response", JSON.stringify(results));
+        return;
+    }
+
+    // Walk all open patcher windows to find by name
+    if (!top || !top.wind) {
+        var results = {"request_id": request_id, "results": {
+            "success": false,
+            "error": "Cannot enumerate patchers (no Wind access)."
+        }};
+        outlet(1, "response", JSON.stringify(results));
+        return;
+    }
+
+    var found = null;
+    var w = top.wind;
+    while (w) {
+        var candidate = w.assoc;
+        if (candidate && candidate.name === name) {
+            if (filepath) {
+                if (candidate.filepath === filepath) {
+                    found = candidate;
+                    break;
+                }
+            } else {
+                found = candidate;
+                break;
+            }
+        }
+        w = w.next;
+    }
+
+    if (!found) {
+        var results = {"request_id": request_id, "results": {
+            "success": false,
+            "error": "Patcher not found: '" + name + "'" + (filepath ? " at path '" + filepath + "'" : "")
+        }};
+        outlet(1, "response", JSON.stringify(results));
+        return;
+    }
+
+    target_patcher = found;
+
+    var results = {"request_id": request_id, "results": {
+        "success": true,
+        "targeted": found.name || "(untitled)",
+        "filepath": found.filepath || "",
+        "object_count": found.count || 0
+    }};
+    outlet(1, "response", JSON.stringify(results));
 }
 
 

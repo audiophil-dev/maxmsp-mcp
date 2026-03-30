@@ -4,12 +4,15 @@ inlets = 1; // Receive network messages here
 outlets = 3; // For status, responses, etc.
 
 // Subpatcher navigation state
-var root_patcher = this.patcher;
-var current_patcher = this.patcher;
+// If js is inside a subpatcher/abstraction, target the parent patcher.
+// This allows the MCP bridge to live in a single [p mcp_bridge] object
+// while editing the patcher that contains it.
+var root_patcher = this.patcher.parentpatcher ? this.patcher.parentpatcher : this.patcher;
+var current_patcher = root_patcher;
 var patcher_stack = [];  // Stack of {patcher, name} for navigation history
 
 // Legacy alias - some functions still use 'p'
-var p = this.patcher;
+var p = root_patcher;
 
 var obj_count = 0;
 var boxes = [];
@@ -236,6 +239,20 @@ function anything() {
                 check_signal_safety(data.request_id);
             } else {
                 outlet(0, "error", "Missing request_id for check_signal_safety");
+            }
+            break;
+        case "list_patchers":
+            if (data.request_id) {
+                list_patchers(data.request_id);
+            } else {
+                outlet(0, "error", "Missing request_id for list_patchers");
+            }
+            break;
+        case "target_patcher":
+            if (data.request_id && data.name) {
+                target_patcher(data.request_id, data.name, data.filepath || null);
+            } else {
+                outlet(0, "error", "Missing request_id or name for target_patcher");
             }
             break;
         default:
@@ -1442,6 +1459,88 @@ function encapsulate(request_id, varnames, subpatcher_name, subpatcher_varname) 
         varname_set: varname_set
     };
     outlet(2, "complete_encapsulate", JSON.stringify(encap_data));
+}
+
+// ========================================
+// Patcher targeting:
+
+function list_patchers(request_id) {
+    // Delegate to v8 add-on: max.frontpatcher may be unreliable in legacy js engine inside subpatchers
+    outlet(2, "list_patchers", request_id);
+}
+
+// Walk up from this.patcher to find the top-level patcher.
+// Works in legacy js engine where max.frontpatcher returns null inside subpatchers.
+function js_get_top_patcher() {
+    var tp = this.patcher;
+    while (tp.parentpatcher) {
+        tp = tp.parentpatcher;
+    }
+    return tp;
+}
+
+// Get a Wind starting point: try max.frontpatcher first, then walk up from this.patcher.
+function js_get_wind_start() {
+    var front = max.frontpatcher;
+    if (front && front.wind) return front;
+    var top = js_get_top_patcher();
+    if (top && top.wind) return top;
+    return null;
+}
+
+function target_patcher(request_id, name, filepath) {
+    // Update js-side references using Wind traversal.
+    // Uses js_get_wind_start() to handle max.frontpatcher being null inside subpatchers.
+    var start = js_get_wind_start();
+
+    if (name === "front") {
+        var front = max.frontpatcher;
+        if (!front) front = js_get_top_patcher();
+        if (front) {
+            root_patcher = front;
+            current_patcher = root_patcher;
+            p = root_patcher;
+            patcher_stack = [];
+            avoid_rect_called = false;
+            post("target_patcher (js): retargeted to front patcher: " + (front.name || "(untitled)") + "\n");
+        } else {
+            post("target_patcher (js): cannot find front patcher\n");
+        }
+    } else if (start) {
+        var found = null;
+        var w = start.wind;
+        while (w) {
+            var candidate = w.assoc;
+            if (candidate && candidate.name === name) {
+                if (filepath) {
+                    if (candidate.filepath === filepath) {
+                        found = candidate;
+                        break;
+                    }
+                } else {
+                    found = candidate;
+                    break;
+                }
+            }
+            w = w.next;
+        }
+        if (found) {
+            root_patcher = found;
+            current_patcher = root_patcher;
+            p = root_patcher;
+            patcher_stack = [];
+            avoid_rect_called = false;
+            post("target_patcher (js): retargeted to '" + found.name + "'\n");
+        } else {
+            post("target_patcher (js): patcher '" + name + "' not found via Wind traversal\n");
+        }
+    } else {
+        post("target_patcher (js): no Wind access available\n");
+    }
+
+    // Always delegate to v8 for the response (v8 has reliable access)
+    var data = JSON.stringify({"name": name, "filepath": filepath || ""});
+    outlet(2, "target_patcher", request_id, data);
 }
 
 // ========================================
