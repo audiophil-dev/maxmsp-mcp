@@ -138,7 +138,7 @@
                 "box": {
                     "id": "obj-js",
                     "maxclass": "newobj",
-                    "numinlets": 1,
+                    "numinlets": 2,
                     "numoutlets": 3,
                     "outlettype": [ "", "", "" ],
                     "patching_rect": [ 15.0, 270.0, 200.0, 22.0 ],
@@ -171,8 +171,41 @@
                     "maxclass": "comment",
                     "numinlets": 1,
                     "numoutlets": 0,
-                    "patching_rect": [ 15.0, 400.0, 550.0, 20.0 ],
+                    "patching_rect": [ 15.0, 430.0, 550.0, 20.0 ],
                     "text": "js/v8 use parentpatcher to target the containing patcher. Backward compatible at top level."
+                }
+            },
+            {
+                "box": {
+                    "id": "obj-console",
+                    "maxclass": "newobj",
+                    "numinlets": 1,
+                    "numoutlets": 1,
+                    "outlettype": [ "" ],
+                    "patching_rect": [ 350.0, 200.0, 120.0, 22.0 ],
+                    "varname": "mcp_console",
+                    "text": "console"
+                }
+            },
+            {
+                "box": {
+                    "id": "obj-pack-console",
+                    "maxclass": "newobj",
+                    "numinlets": 3,
+                    "numoutlets": 1,
+                    "outlettype": [ "" ],
+                    "patching_rect": [ 350.0, 240.0, 72.0, 22.0 ],
+                    "text": "pack s s 0"
+                }
+            },
+            {
+                "box": {
+                    "id": "obj-console-label",
+                    "maxclass": "comment",
+                    "numinlets": 1,
+                    "numoutlets": 0,
+                    "patching_rect": [ 480.0, 200.0, 150.0, 20.0 ],
+                    "text": "Console capture -> js inlet 1"
                 }
             }
         ],
@@ -259,6 +292,18 @@
                 "patchline": {
                     "destination": [ "obj-node", 0 ],
                     "source": [ "obj-v8", 1 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-pack-console", 0 ],
+                    "source": [ "obj-console", 0 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-js", 1 ],
+                    "source": [ "obj-pack-console", 0 ]
                 }
             }
         ]
